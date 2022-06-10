@@ -3,12 +3,16 @@ import os
 import time
 test_dir='OS/week17/data'
 def readFileToString(file_name):
-    filehandle=open(file_name,"r")
-    str=filehandle.read().strip(' ')
+    str=""
+    with open(file_name,"r",errors='ignore',encoding='utf-8') as f:
+        for line in f:
+            str+=repr(line)
+    
+    str=str.strip(' ')
     str=str.strip('\n')
     str=str.strip('\r')
     str=str.strip('\t')
-    filehandle.close()
+    f.close()
     return str
 
 def getFulldir(dir):
@@ -30,12 +34,16 @@ def walkDir(dir_name):
                 timestr=time.localtime(os.path.getmtime(fpath))
                 timestr=time.strftime('%Y-%m-%d %H:%M:%S',timestr)
                 files.append([fpath,timestr])
-    return_dict.update({id:files}) 
+        return_dict.update({id:files}) 
     return return_dict
 
 def isSame(file_dir1,file_dir2):
-    return readFileToString(file_dir1)==readFileToString(file_dir2)
-
+    str1=readFileToString(file_dir1)
+    str2=readFileToString(file_dir2)
+    ans=str1==str2
+    if ans:
+        return True
+    return False
 constant_dict={}
 score_dict={}
 stufile_dict={}
@@ -64,32 +72,36 @@ def checkSameWithFileName(files_name_list):
             if not exist_flag:
                 constant_dict[stu]*=0
         for stu,_,cname_t in compare_list:
-            if ifAfterDate(cname_t):
+            if ifAfterDate(cname_t) and constant_dict[stu]!=0.9:
                 constant_dict[stu]*=0.9
         
-        for (stu1,file_name1) in compare_list:
-            for (stu2,file_name2) in compare_list:
+        for (stu1,file_name1,__) in compare_list:
+            for (stu2,file_name2,_) in compare_list:
                 if stu1!=stu2 and isSame(file_name1,file_name2):
                     constant_dict[stu1]*=0
                     constant_dict[stu2]*=0
                     
 def CompileAndTest(stu_id,test_id):
-    cpp_files=stufile_dict[stu_id][0]
+    cpp_files=stufile_dict[stu_id]
     os.mkdir(getFulldir('test_temp'))
     testdir=test_dir+'/test'+str(test_id)
-    os.system("cp -r "+getFulldir(testdir)+" "+getFulldir('test_temp'))
-    for file in cpp_files:
-        if file[-3:]=='.cpp':
-            os.system("cp "+file[0]+" "+getFulldir('test_temp'))
-    os.system("cd "+getFulldir('test_temp')+" && g++ -o test "+"code.cpp"+" && ./test")
+    os.system("cp  "+getFulldir(testdir)+"/* "+getFulldir('test_temp')+"/")
+    for file_ in cpp_files:
+        file=file_[0]
+        if file[-3:]=='cpp':
+            os.system("cp "+file+" "+getFulldir('test_temp'))
+    os.system("mv "+getFulldir('test_temp/result.txt')+" "+getFulldir('test_temp/result.txt.'+str(test_id)))
+    os.system("cd "+getFulldir('test_temp')+" && g++ -std=c++2a -o test "+"code.cpp"+" && sudo chmod a=rwx -R "+getFulldir('test_temp')+ " && ./test")
+    
     os.system("cd .")
+    
     stu_result=None
     for file in cpp_files:
-        if file[-10:]=='result.txt':
+        if file[0][-10:]=='result.txt':
             stu_result=file[0]
-    if isSame(getFulldir('test_temp/test.out'),stu_result):
+    if stu_result!=None and isSame(getFulldir('test_temp/result.txt'),stu_result):
         score_dict[stu_id]+=10
-    if isSame(getFulldir('test_temp/test.out'),getFulldir(testdir+'test_temp/result.txt')):
+    if isSame(getFulldir('test_temp/result.txt.'+str(test_id)),getFulldir('test_temp/result.txt')):
         score_dict[stu_id]+=testid_scores[test_id]
     os.system("rm -rf "+getFulldir('test_temp'))
     
@@ -103,6 +115,8 @@ def test():
             CompileAndTest(stuid,testid)
     out=open('score.txt','w')
     for stuid in score_dict.keys():
-        out.write(stuid+' '+str(score_dict[stuid]*constant_dict[stuid])+'\n')
-        
+        out.write(format((stuid+" %.1f \n")%(score_dict[stuid]*constant_dict[stuid])))
+    out.close()
+    
+    
 test()
